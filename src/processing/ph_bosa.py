@@ -17,13 +17,12 @@ BOSA_LOCALIDAD_CODE = "07"       # gpkg / presidenciales ZONA
 BOSA_COMUNA_LABEL = "LOCALIDAD 7 BOSA"  # territoriales 2023 "Nombre Comuna"
 
 PH_PRESIDENCIALES = "MOVIMIENTO POLÍTICO PACTO HISTÓRICO"
-# Match exacto (tras quitar tildes/mayúsculas) por corporación: en Alcaldía la
-# coalición de PH se registró bajo un nombre distinto al de Concejo/JAL.
-PH_TERRITORIALES_NORM = {
-    "CONCEJO": "PACTO HISTORICO",
-    "JAL": "PACTO HISTORICO",
-    "ALCALDE": "PACTO HISTORICO BOGOTA",
-}
+# Territoriales: cada corporación (y en JAL, cada localidad) registra la
+# coalición de PH con un nombre distinto ('PACTO HISTÓRICO', 'PACTO HISTÓRICO
+# BOGOTÁ', 'PACTO HISTÓRICO COLOMBIA PUEDE', 'COALICIÓN PACTO HISTÓRICO',
+# 'COALICIÓN PACTO POR USME'...). Match: contiene "PACTO" (sin tildes) --
+# se revisó el listado completo y todos los partidos con "PACTO" son de PH.
+PH_TERRITORIALES_SUBSTRING = "PACTO"
 
 
 def presidenciales_2022(geo_bosa):
@@ -71,7 +70,7 @@ def territoriales_2023(geo_bosa, corporacion):
 
     total = df.groupby("Nombre Puesto")["Total Votos"].sum().rename("votos_totales")
     ph = (
-        df[df["partido_norm"] == PH_TERRITORIALES_NORM[corporacion]]
+        df[df["partido_norm"].str.contains(PH_TERRITORIALES_SUBSTRING, regex=False)]
         .groupby("Nombre Puesto")["Total Votos"]
         .sum()
         .rename("votos_ph")
@@ -91,9 +90,10 @@ NOTAS = pd.DataFrame({
     "Nota": [
         "Presidenciales 2022: coincide con el 1er round (total PH en Bogotá ~1.7M votos, consistente con el resultado real de Petro). "
         "El campo CANNOMBRE del archivo fuente trae mal el nombre de candidato (dice 'IVÁN CEPEDA CASTRO'); no afecta el total por partido usado aquí.",
-        "Territoriales 2023: match exacto (sin tildes/mayúsculas) por corporación: 'PACTO HISTÓRICO' en Concejo y JAL, "
-        "'PACTO HISTÓRICO BOGOTÁ' en Alcaldía (la coalición de Bolívar se registró con ese nombre distinto). "
-        "Otras variantes como 'PACTO HISTORICO COLOMBIA PUEDE' o 'COALICIÓN PACTO POR USME' siguen excluidas.",
+        "Territoriales 2023: se cuenta como PH cualquier partido cuyo nombre contenga 'PACTO' (sin tildes) -- "
+        "cubre 'PACTO HISTÓRICO', 'PACTO HISTÓRICO BOGOTÁ' (Alcaldía), 'PACTO HISTÓRICO COLOMBIA PUEDE', "
+        "'COALICIÓN PACTO HISTÓRICO' y 'COALICIÓN PACTO POR USME' (variantes por corporación/localidad, "
+        "todas confirmadas como parte de la coalición de PH).",
         "Cámara, Senado y Consejos de Juventud: NO incluidos, no hay archivo fuente en data/ para esas elecciones todavía.",
         "Geometría (lat/lon): se une por nombre de puesto normalizado (el número de puesto del gpkg no coincide "
         "con el de la Registraduría). ~10-15% de los puestos no tienen match porque son sitios nuevos/renombrados "

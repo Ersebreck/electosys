@@ -15,15 +15,24 @@ from geo_utils import load_puestos, merge_with_geo, norm_key
 
 OUT_PATH = "output/files/dataset_elecciones.csv"
 
-# Etiqueta de PH por elección/corporación, ya normalizada (sin tildes, mayúsculas)
-# porque el archivo de territoriales 2023 mezcla 'PACTO HISTORICO'/'PACTO HISTÓRICO'
-# según la corporación (ver notas en ph_bosa.py sobre Alcaldía con nombre distinto).
-PH_LABEL_NORM = {
-    "Presidencial 2022": norm_key("MOVIMIENTO POLÍTICO PACTO HISTÓRICO"),
-    "Alcaldía 2023": norm_key("PACTO HISTÓRICO BOGOTÁ"),
-    "Concejo 2023": norm_key("PACTO HISTÓRICO"),
-    "JAL 2023": norm_key("PACTO HISTÓRICO"),
-}
+# Presidencial 2022 tiene un solo partido nacional, match exacto.
+# Territoriales 2023: cada corporación (y en JAL, cada localidad) registró la
+# coalición de PH con un nombre distinto -- 'PACTO HISTÓRICO', 'PACTO HISTÓRICO
+# BOGOTÁ', 'PACTO HISTÓRICO COLOMBIA PUEDE', 'COALICIÓN PACTO HISTÓRICO',
+# 'COALICIÓN PACTO POR USME' (confirmado que también es PH), etc.
+# Match: contiene "PACTO" (sin tildes) como subcadena -- se revisó el listado
+# completo de partidos de territoriales 2023 y todos los que contienen "PACTO"
+# son variantes de esta misma coalición.
+PH_PRESIDENCIAL_EXACTO = norm_key("MOVIMIENTO POLÍTICO PACTO HISTÓRICO")
+PH_TERRITORIAL_SUBSTRING = norm_key("PACTO")
+
+
+def ph_mask(long_df):
+    partido_norm = long_df["partido"].map(norm_key)
+    es_presidencial = long_df["eleccion"] == "Presidencial 2022"
+    return (es_presidencial & (partido_norm == PH_PRESIDENCIAL_EXACTO)) | (
+        ~es_presidencial & partido_norm.str.contains(PH_TERRITORIAL_SUBSTRING, regex=False)
+    )
 
 
 def load_election(eleccion, path, sheet):
@@ -48,9 +57,7 @@ def build_puesto_summary(long_df, geo):
     total = long_df.groupby(["eleccion", "codigo_localidad", "localidad", "nombre_puesto"])["votos"].sum()
     total = total.rename("votos_totales").reset_index()
 
-    partido_norm = long_df["partido"].map(norm_key)
-    ph_target_norm = long_df["eleccion"].map(PH_LABEL_NORM)
-    ph_rows = long_df[partido_norm == ph_target_norm]
+    ph_rows = long_df[ph_mask(long_df)]
     ph = ph_rows.groupby(["eleccion", "codigo_localidad", "nombre_puesto"])["votos"].sum().rename("votos_ph")
 
     summary = total.merge(ph, on=["eleccion", "codigo_localidad", "nombre_puesto"], how="left")
