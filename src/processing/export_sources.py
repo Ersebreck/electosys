@@ -5,6 +5,9 @@ hoja de Excel y quedar al grano correcto para el EDA).
 
 Salida: output/files/<fuente>.xlsx
 """
+import io
+import zipfile
+
 import pandas as pd
 
 from geo_utils import DATA_DIR, load_puestos
@@ -57,6 +60,39 @@ def divipole_censo_bogota():
     })
 
 
+def divipole_censo_2026_bogota():
+    """Censo (DIVIPOL, formato plano de ancho fijo) de la Presidencial 2026,
+    usado como proxy del censo de Territoriales 2023: la Registraduría no
+    publicó un DIVIPOLE para esa elección en estos archivos. El censo de
+    Bogotá cambia poco de un año a otro, así que sirve para estimar
+    participación/abstención aunque no sea el censo exacto de 2023.
+    Layout de línea (146 car.): dep[0:2] mun[2:5] zona[5:7] puesto[7:9]
+    depnombre[9:21] mununombre[21:51] puestonombre[51:91] flag[91:93]
+    mujeres[93:100] _[100:101] hombres[101:108] mesas[108:114]
+    localidad_cod[114:116] localidad_nombre[116:146].
+    """
+    outer = zipfile.ZipFile(f"{DATA_DIR}/MMV_Presidente1V_2026.zip")
+    inner_path = "MMV_Presidente1V_2026/MMV_Presidente1V_2026/ARCHIVOSBASICOS_AUDITORES_PRESIDENTE_2026_V3.zip"
+    inner = zipfile.ZipFile(io.BytesIO(outer.read(inner_path)))
+    divipol_name = next(n for n in inner.namelist() if "DIVIPOL_" in n)
+    lines = inner.read(divipol_name).decode("latin1").splitlines()
+
+    rows = [
+        {
+            "codigo_localidad": line[5:7],
+            "nombre_puesto": line[51:91].strip(),
+            "censo_mujeres": int(line[93:100]),
+            "censo_hombres": int(line[101:108]),
+            "mesas": int(line[108:114]),
+        }
+        for line in lines if line[0:2] == "16"  # 16 = Bogotá D.C. en la codificación de Registraduría
+    ]
+    df = pd.DataFrame(rows)
+    df["censo_total"] = df["censo_mujeres"] + df["censo_hombres"]
+    key = ["codigo_localidad", "nombre_puesto"]
+    return df.groupby(key, as_index=False)[["censo_mujeres", "censo_hombres", "censo_total", "mesas"]].sum()
+
+
 def puestos_votacion_geo():
     return load_puestos()  # toda la ciudad
 
@@ -70,6 +106,7 @@ def main():
             "JAL": territoriales_2023("JAL"),
         },
         "divipole_censo_2022_bogota": {"Censo_Puestos": divipole_censo_bogota()},
+        "divipole_censo_2026_bogota": {"Censo_Puestos": divipole_censo_2026_bogota()},
         "puestos_votacion_geo": {"Puestos": puestos_votacion_geo()},
     }
 

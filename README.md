@@ -61,5 +61,11 @@ python3 src/processing/ph_bosa.py
   `PACTO HISTÓRICO BOGOTÁ`, `PACTO HISTÓRICO COLOMBIA PUEDE`, `COALICIÓN
   PACTO POR USME`, etc.) — se cuenta como PH cualquier partido cuyo nombre
   contenga "PACTO".
-- **Participación real** (% sobre censo) solo está disponible para
-  Presidencial 2022, único censo que tenemos.
+- **Participación/abstención**: Presidencial 2022 usa su censo real
+  (`DIVIPOLE_PRESIDENTE_31_MAYO.csv`). Territoriales 2023 no tiene censo
+  publicado en los archivos de la Registraduría, así que se usa como proxy
+  el censo de Presidencial 2026 (`MMV_Presidente1V_2026.zip`, archivo
+  `DIVIPOL_*`) — el censo de Bogotá varía poco de una elección a otra.
+  Quedan sin dato los puestos especiales/institucionales (cárceles, PUESTO
+  CENSO) y un ~7% de puestos sin match por nombre (mismo problema de la
+  geometría, ver arriba).

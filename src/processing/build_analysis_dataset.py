@@ -66,19 +66,53 @@ def build_puesto_summary(long_df, geo):
     return merge_with_geo(summary, geo)
 
 
+def add_participacion(summary):
+    """Suma columnas censo_total / participacion_pct / abstencion_pct.
+
+    Presidencial 2022 usa su propio censo (divipole_censo_2022_bogota, único
+    censo real que tenemos). Territoriales 2023 no tiene censo publicado en
+    los archivos de la Registraduría, así que se usa como proxy el censo de
+    la Presidencial 2026 (divipole_censo_2026_bogota) -- el censo de Bogotá
+    varía poco de una elección a otra.
+    """
+    censo_2022 = pd.read_excel("output/files/divipole_censo_2022_bogota.xlsx")
+    censo_2022["_key"] = censo_2022["nombre_puesto"].map(norm_key)
+    censo_2022 = censo_2022[["_key", "censo_total"]]
+
+    censo_terr = pd.read_excel("output/files/divipole_censo_2026_bogota.xlsx")
+    censo_terr["_key"] = (
+        censo_terr["codigo_localidad"].astype(str).str.zfill(2) + "|" + censo_terr["nombre_puesto"].map(norm_key)
+    )
+    censo_terr = censo_terr[["_key", "censo_total"]]
+
+    pres = summary[summary["eleccion"] == "Presidencial 2022"].copy()
+    pres["_key"] = pres["nombre_puesto"].map(norm_key)
+    pres = pres.merge(censo_2022, on="_key", how="left").drop(columns="_key")
+
+    terr = summary[summary["eleccion"] != "Presidencial 2022"].copy()
+    terr["_key"] = terr["codigo_localidad"] + "|" + terr["nombre_puesto"].map(norm_key)
+    terr = terr.merge(censo_terr, on="_key", how="left").drop(columns="_key")
+
+    out = pd.concat([pres, terr], ignore_index=True)
+    out["participacion_pct"] = (out["votos_totales"] * 100 / out["censo_total"]).round(2)
+    out["abstencion_pct"] = (100 - out["participacion_pct"]).round(2)
+    return out
+
+
 def main():
     geo = load_puestos()
     long_df = build_long_table()
     long_df.to_csv("output/files/dataset_elecciones_largo.csv", index=False)
 
     summary = build_puesto_summary(long_df, geo)
+    summary = add_participacion(summary)
     summary.to_csv(OUT_PATH, index=False)
 
     print(f"OK -> output/files/dataset_elecciones_largo.csv ({len(long_df)} filas, todos los partidos)")
     print(f"OK -> {OUT_PATH} ({len(summary)} filas, resumen PH por puesto)")
     for eleccion, g in summary.groupby("eleccion"):
         print(f"  {eleccion}: {len(g)} puestos, {g['latitud'].isna().sum()} sin geometría, "
-              f"{int(g['votos_ph'].sum())} votos PH")
+              f"{g['censo_total'].isna().sum()} sin censo, {int(g['votos_ph'].sum())} votos PH")
 
 
 if __name__ == "__main__":

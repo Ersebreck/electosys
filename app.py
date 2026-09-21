@@ -10,7 +10,6 @@ import plotly.express as px
 import streamlit as st
 
 sys.path.insert(0, "src/processing")
-from geo_utils import norm_key  # noqa: E402
 
 st.set_page_config(page_title="Electosys Bogotá", layout="wide")
 
@@ -26,12 +25,10 @@ def load_data():
     largo = pd.read_csv("output/files/dataset_elecciones_largo.csv", dtype={"codigo_localidad": str})
     with open("output/maps/localidades.geojson", encoding="utf-8") as f:
         geojson = json.load(f)
-    censo = pd.read_excel("output/files/divipole_censo_2022_bogota.xlsx")
-    censo["_key"] = censo["nombre_puesto"].map(norm_key)
-    return resumen, largo, geojson, censo
+    return resumen, largo, geojson
 
 
-resumen, largo, geojson, censo = load_data()
+resumen, largo, geojson = load_data()
 
 
 def with_porcentaje(df):
@@ -53,8 +50,8 @@ df = resumen[(resumen["eleccion"] == eleccion) & (resumen["localidad"].isin(loca
 df_geo = df.dropna(subset=["latitud", "longitud"])
 long_sel = largo[(largo["eleccion"] == eleccion) & (largo["localidad"].isin(localidades_sel))]
 
-tab_puntos, tab_bosa, tab_localidad, tab_barras, tab_dispersion = st.tabs(
-    ["Mapa de puntos", "Mapa Bosa", "Mapa por localidad", "Partidos", "Dispersión"]
+tab_puntos, tab_bosa, tab_localidad, tab_participacion, tab_barras, tab_dispersion = st.tabs(
+    ["Mapa de puntos", "Mapa Bosa", "Mapa por localidad", "Participación", "Partidos", "Dispersión"]
 )
 
 with tab_puntos:
@@ -100,6 +97,40 @@ with tab_localidad:
     fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
     st.plotly_chart(fig, use_container_width=True)
 
+with tab_participacion:
+    d = df.dropna(subset=["censo_total"])
+    sin_censo = len(df) - len(d)
+    if eleccion != "Presidencial 2022":
+        st.caption("Censo proxy: no existe censo publicado de Territoriales 2023, se usa el censo de "
+                   "Presidencial 2026 (varía poco de una elección a otra en Bogotá) — ver Notas.")
+    st.caption(f"{sin_censo} de {len(df)} puestos sin censo (sitios especiales/institucionales o sin match), "
+               "excluidos de este cálculo.")
+
+    agg = d.groupby(["codigo_localidad", "localidad"], as_index=False)[["votos_totales", "censo_total"]].sum()
+    agg["participacion_pct"] = (agg["votos_totales"] * 100 / agg["censo_total"]).round(2)
+    agg["abstencion_pct"] = (100 - agg["participacion_pct"]).round(2)
+    agg["Abstención"] = agg["abstencion_pct"].map(lambda v: f"{v:.1f} %")
+    agg["Participación"] = agg["participacion_pct"].map(lambda v: f"{v:.1f} %")
+
+    col_mapa, col_barras = st.columns([3, 2])
+    with col_mapa:
+        fig = px.choropleth_map(
+            agg, geojson=geojson, locations="codigo_localidad",
+            featureidkey="properties.codigo_localidad", color="abstencion_pct",
+            hover_name="localidad",
+            hover_data={"votos_totales": True, "censo_total": True, "abstencion_pct": False,
+                        "Abstención": True, "Participación": True, "codigo_localidad": False},
+            color_continuous_scale="RdYlGn_r", zoom=9.5, center=BOGOTA_CENTER, height=600, opacity=0.8,
+        )
+        fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
+        st.plotly_chart(fig, use_container_width=True)
+    with col_barras:
+        rank = agg.sort_values("abstencion_pct", ascending=False)
+        fig = px.bar(rank, x="abstencion_pct", y="localidad", orientation="h",
+                     title=f"% Abstención por localidad — {eleccion}", height=600)
+        fig.update_layout(yaxis=dict(categoryorder="total ascending"), xaxis_title="% abstención")
+        st.plotly_chart(fig, use_container_width=True)
+
 with tab_barras:
     top_n = st.slider("Top N partidos", 5, 20, 10)
     top = long_sel.groupby("partido", as_index=False)["votos"].sum().sort_values("votos", ascending=False).head(top_n)
@@ -109,15 +140,8 @@ with tab_barras:
     st.plotly_chart(fig, use_container_width=True)
 
 with tab_dispersion:
-    if eleccion == "Presidencial 2022":
-        d = df.copy()
-        d["_key"] = d["nombre_puesto"].map(norm_key)
-        d = d.merge(censo[["_key", "censo_total"]], on="_key", how="inner")
-        d["participacion_pct"] = (d["votos_totales"] * 100 / d["censo_total"]).round(2)
-        x_col, x_label = "participacion_pct", "% participación (votos / censo)"
-    else:
-        d = df.copy()
-        x_col, x_label = "votos_totales", "Votos totales del puesto (no hay censo 2023 disponible)"
+    d = df.dropna(subset=["participacion_pct"])
+    x_col, x_label = "participacion_pct", "% participación (votos / censo)"
 
     fig = px.scatter(
         d, x=x_col, y="pct_ph", hover_name="nombre_puesto", hover_data=["localidad"],
@@ -134,6 +158,9 @@ with st.expander("Notas y limitaciones"):
   porque son sitios nuevos/renombrados que el gpkg no tiene.
 - **Alcaldía 2023**: PH corrió bajo la marca "PACTO HISTÓRICO BOGOTÁ", distinta de "PACTO HISTÓRICO"
   usado en Concejo/JAL — cada corporación usa su propia etiqueta exacta.
-- **Participación real (% sobre censo)** solo está disponible para Presidencial 2022 (único censo que
-  tenemos, `DIVIPOLE_PRESIDENTE_31_MAYO.csv`); para 2023 se usa el total de votos del puesto como proxy.
+- **Participación/abstención**: Presidencial 2022 usa su censo real (`DIVIPOLE_PRESIDENTE_31_MAYO.csv`).
+  Territoriales 2023 no tiene censo publicado en los archivos de la Registraduría, así que se usa como
+  proxy el censo de Presidencial 2026 (el censo de Bogotá varía poco de una elección a otra) — los
+  puestos especiales/institucionales (cárceles, PUESTO CENSO) y ~7% de los puestos sin match quedan
+  excluidos de este cálculo.
 """)
