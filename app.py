@@ -16,13 +16,17 @@ st.set_page_config(page_title="Electosys Bogotá", layout="wide")
 BOGOTA_CENTER = {"lat": 4.65, "lon": -74.1}
 BOSA_CENTER = {"lat": 4.616, "lon": -74.19}
 BOSA_CODIGO_LOCALIDAD = "07"
-ELECCIONES = ["Presidencial 2022", "Alcaldía 2023", "Concejo 2023", "JAL 2023"]
+ELECCIONES = [
+    "Presidencial 2022", "Alcaldía 2023", "Concejo 2023", "JAL 2023",
+    "Presidencial 2026", "Cámara 2026", "Senado 2026",
+]
 
 
 @st.cache_data
 def load_data():
-    resumen = pd.read_csv("output/files/dataset_elecciones.csv", dtype={"codigo_localidad": str})
-    largo = pd.read_csv("output/files/dataset_elecciones_largo.csv", dtype={"codigo_localidad": str})
+    dtypes = {"codigo_localidad": str, "puesto": str}
+    resumen = pd.read_csv("output/files/dataset_elecciones.csv", dtype=dtypes)
+    largo = pd.read_csv("output/files/dataset_elecciones_largo.csv", dtype=dtypes)
     with open("output/maps/localidades.geojson", encoding="utf-8") as f:
         geojson = json.load(f)
     return resumen, largo, geojson
@@ -38,8 +42,7 @@ def with_porcentaje(df):
 
 st.title("Electosys")
 st.caption("Sistema de Análisis de Elecciones — resultados Pacto Histórico en Bogotá")
-st.caption("Presidencial 2022 y Territoriales 2023 (Alcaldía/Concejo/JAL). Cámara, Senado y "
-           "Consejos de Juventud pendientes (sin archivo fuente todavía).")
+st.caption("Presidencial 2022, Territoriales 2023 (Alcaldía/Concejo/JAL), y Presidencial/Cámara/Senado 2026.")
 
 with st.sidebar:
     eleccion = st.radio("Elección", ELECCIONES, index=0)
@@ -152,15 +155,20 @@ with tab_dispersion:
 
 with st.expander("Notas y limitaciones"):
     st.markdown("""
-- **Cámara, Senado y Consejos de Juventud**: sin archivo fuente en `data/`, no incluidos.
+- **Consejos de Juventud**: sin archivo fuente en `data/`, no incluidos (es una elección local, no
+  viene en el paquete de Congreso). Congreso 2026 también trae Consultas internas de partidos y CITREP
+  (curules de paz), no incluidos por no ser corporaciones de elección popular general.
+- **2026 (Presidencial/Cámara/Senado)**: datos de ESCRUTINIO (resultado oficial, no PRECONTEO). El
+  cruce de puesto/censo usa el código exacto de puesto de la Registraduría (mismo archivo DIVIPOL de
+  cada elección), no el nombre — por eso el 0% de puestos sin censo.
 - **Geometría**: se une por nombre de puesto normalizado (el número de puesto del gpkg de IDECA no
   coincide con el código de puesto de la Registraduría). ~10-15% de los puestos no tienen coordenada
   porque son sitios nuevos/renombrados que el gpkg no tiene.
 - **Alcaldía 2023**: PH corrió bajo la marca "PACTO HISTÓRICO BOGOTÁ", distinta de "PACTO HISTÓRICO"
   usado en Concejo/JAL — cada corporación usa su propia etiqueta exacta.
-- **Participación/abstención**: Presidencial 2022 usa su censo real (`DIVIPOLE_PRESIDENTE_31_MAYO.csv`).
-  Territoriales 2023 no tiene censo publicado en los archivos de la Registraduría, así que se usa como
-  proxy el censo de Presidencial 2026 (el censo de Bogotá varía poco de una elección a otra) — los
-  puestos especiales/institucionales (cárceles, PUESTO CENSO) y ~7% de los puestos sin match quedan
-  excluidos de este cálculo.
+- **Participación/abstención**: Presidencial 2022, Presidencial 2026, Cámara 2026 y Senado 2026 usan su
+  propio censo real. Territoriales 2023 no tiene censo publicado en los archivos de la Registraduría,
+  así que se usa como proxy el censo de Presidencial 2026 (el censo de Bogotá varía poco de una elección
+  a otra) — los puestos especiales/institucionales (cárceles, PUESTO CENSO) y ~7% de los puestos sin
+  match quedan excluidos de este cálculo.
 """)

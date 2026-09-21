@@ -5,4 +5,10 @@ __pycache__/
 data/
 legacy/
 
+# Export intermedio de Congreso 2026 a nivel candidato (voto preferente
+# nacional): 55-120MB, supera el límite de tamaño de archivo de GitHub.
+# Regenerable con export_sources.py; no lo lee la app (solo build_analysis_dataset.py).
+output/files/congreso_2026_camara_bogota.csv
+output/files/congreso_2026_senado_bogota.csv
+
 .streamlit/secrets.toml
