@@ -24,8 +24,8 @@ KEY = ["eleccion", "codigo_localidad", "nombre_puesto"]
 
 
 def process_2019():
-    print("Leyendo CSV de 2019...")
-    df = pd.read_csv("output/files/MMV_2019_16_BOGOTA DC.csv", dtype=str)
+    print("Leyendo CSV de 2019 (comprimido)...")
+    df = pd.read_csv("output/files/mmv_2019_optimizado.csv.gz", dtype=str)
     df["Total Votos"] = pd.to_numeric(df["Total Votos"])
 
     # Agregar a nivel puesto x partido (sin mesa, como el resto de datasets)
