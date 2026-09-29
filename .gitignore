@@ -11,4 +11,10 @@ legacy/
 output/files/congreso_2026_camara_bogota.csv
 output/files/congreso_2026_senado_bogota.csv
 
+# CSV crudo de 2019 (395MB), ya procesado e integrado a los datasets.
+# Regenerable desde la Registraduría; no lo lee la app.
+output/files/MMV_2019_16_BOGOTA DC.csv
+output/files/mmv_2019_optimizado.csv
+output/files/MMV_TERRITORIALES2019_BOGOTÁ.zip
+
 .streamlit/secrets.toml
