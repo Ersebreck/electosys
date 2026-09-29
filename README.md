@@ -3,7 +3,7 @@
 Sistema de Análisis de Elecciones — procesamiento y visualización de resultados
 electorales de Bogotá, con foco en el desempeño del Pacto Histórico (PH).
 
-App en vivo (Streamlit Community Cloud): _agregar link una vez desplegado_.
+App en vivo (Streamlit Community Cloud): https://electosys.streamlit.app/.
 
 ## Qué incluye
 
